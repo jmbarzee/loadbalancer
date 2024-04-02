@@ -9,6 +9,8 @@ state: draft
 # Required Approvers
 2 of 3 (@jakule, @smallinsky, @rosstimothy)
 
+**Author’s Note:** Parts of this document cover “optional” items. These are included to depict the possible design choices that would be considered when designing a real-world system. These are not actually intended to be implemented within the scope of the interview.
+
 
 # What
 A Layer 4 load balancer library with rate limiting and health checking. Server leveraging library behind mTLS.
@@ -17,6 +19,9 @@ A Layer 4 load balancer library with rate limiting and health checking. Server l
 Describe the features and design of a layer 4 load balancer as a catalyst for discussion and guide for work. Generally depict my skills as an engineer by simulating working with a small team from teleport engineering.
 
 # Details
+**Author’s Note:** Parts of this document cover “optional” items. These are included to depict the possible design choices that would be considered when designing a real-world system. These are not actually intended to be implemented within the scope of the interview.
+
+
 
 ## Scope
 ### Library
