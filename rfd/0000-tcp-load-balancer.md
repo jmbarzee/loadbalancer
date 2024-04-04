@@ -60,8 +60,10 @@ Keys in the cache will be a tuple (ClientID|ServerID, WindowStartTime). Each tim
     connections := currentWindowsConnections + previousWindowsConnections * durationSinceCurrentWindow / windowDuration
 ```
 
-### Upstreams
-Health checking is both passive and active. Upstreams are treated as available only after succeeding a routine (+ jitter) health check. Upstreams become unavailable after either failing a health check, timing out, or returning a connection error. A connection will choose the upstream that has the least existing connections based on the sliding windows supported by the rate limiting.
+### Health Checking
+Health checking is both passive and active. Upstreams are healthy only after succeeding a routine (+ jitter) health check. Upstreams become unhealthy and thus unavailable after either failing a health check, timing out, or returning a connection error. Configuration for the number of retries and length of time outs to an upstream may be configurable at server startup, determined at implementation.
+
+ A connection will choose the upstream that has the least existing connections based on the sliding windows supported by the rate limiting.
 
 
 ### API
