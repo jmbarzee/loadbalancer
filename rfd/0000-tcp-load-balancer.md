@@ -46,29 +46,23 @@ For further details see [Authentication & mTLS](###Authentication-&-mTLS)
 
 ## Implementation - Library
 ### Rate Limiting
-Rate Limiting is performed for both downstreams and upstreams. It will leverage a sliding window algorithm to count requests and deny requests that exceed the limits. A KV-store supporting TTL will hold the request counts. Ideally it would also support LFU eviction (protecting the LB from OOM) and concurrent access (preventing bottle-necking/contention on the shared KV-store).
+Rate Limiting is performed for downstreams based on a count of existing connections. The count will be incremented by opening connections and decremented by closing ones. It will be critical that all possible forms of connections ending will decrement the counter, otherwise clients will be rate limited unnecessarily.
 
-#### Sliding Window as A Connection Counter
-Keys in the cache will be a tuple (ClientID|ServerID, WindowStartTime). Each time a new connection is made or a worker reviews an existing connection, the relevant key will have its value incremented. 
-```go
-    // Get Connections for a client or server
-    previousKey := makeKey(ID, PreviousWindowStartTime)
-    currentKey := makeKey(ID, CurrentWindowStartTime)
-    previousWindowsConnections := cache.Access(previousKey)
-    currentWindowsConnections := cache.Access(currentKey)
-    durationSinceCurrentWindow := time.Now().Sub(CurrentWindowStartTime)
-    connections := currentWindowsConnections + previousWindowsConnections * durationSinceCurrentWindow / windowDuration
-```
+### Load Balancing
+Load balancing is preformed for healthy upstreams. When a new connection is started, a priority queue will be used to pull the upstream with the least connections. The priority queue will be implemented with a golang heap with order based on the number of existing connections to an upstream. Unhealthy upstreams will be removed if they are first in the queue, and the next upstream will be checked.
 
 ### Health Checking
 Health checking is both passive and active. Upstreams are healthy only after succeeding a routine (+ jitter) health check. Upstreams become unhealthy and thus unavailable after either failing a health check, timing out, or returning a connection error. Configuration for the number of retries and length of time outs to an upstream may be configurable at server startup, determined at implementation.
 
- A connection will choose the upstream that has the least existing connections based on the sliding windows supported by the rate limiting.
-
-
 ### API
 
 ```go
+// NewLoadBalancer takes configuration values and creates a LoadBalancer with it
+// Config could include rate limits, upstreams, timeouts, etc.
+func NewLoadBalancer(cfg Config) ImplementedLoadBalancer {
+    ...
+}
+
 type LoadBalancer interface {
     // Start spins up management goroutines for the LoadBalancer
     // error is nil only when LoadBalancer configuration is functional
@@ -80,24 +74,6 @@ type LoadBalancer interface {
     // error is nil only when all connections close gracefully
     // otherwise, error offers insight into why the connections couldn't close gracefully.
     Stop(ctx context.Context) error
-
-    // SetRateLimit allows a rate limit to be set for a single client
-    // connections is the max number of connections allowed over a single window.
-    // Because of the sliding window algorithm which will be used for rate limits,
-    // there may appear to be more or less connections allowed. 
-    // This error will be minimal and averaged over time because.
-    // connections over the previous window will be treated as
-    // evenly distributed over that window to estimate 
-    // how many connections were received in portion of the window
-    SetRateLimit(clientID string, connections int, window time.Time) error
-
-    // AddUpstream adds configuration for an Upstream
-    // if the upstreamGroup does not already exist, it will be created.
-    AddUpstream(upstreamGroup string, config Upstream) error
-
-    // RemoveUpstream was added, anticipating future needs. 
-    // on second review, it won't be necessary for the scope of this challenge
-    // RemoveUpstream(upstreamGroup string, config Upstream) error
 
     // Handle is the primary use of LoadBalancer
     // Handle requires that LoadBalancer.Start(ctx) error has been called
@@ -122,7 +98,7 @@ type Upstream interface {
     ID() string // possibly changed to a typed uuid
 
     // Provides necessary information to call net.DialTCP()
-	TCPAddr() net.TCPAddr
+    TCPAddr() net.TCPAddr
     // Healthy returns weather or not the upstream is healthy
     // and can be passed new connections.
     Healthy() bool
@@ -130,7 +106,7 @@ type Upstream interface {
 
 // UpstreamGroups is used to look up upstreams
 // Data is purely illustrative
-var UpstreamGroups map[string][]Upstream = map[string][]Upstream{
+var UpstreamGroups = map[string][]Upstream{
     "UIServers" : []Upstream{
         ...
     },
@@ -145,7 +121,7 @@ var UpstreamGroups map[string][]Upstream = map[string][]Upstream{
 
 
 ### Internals
-Leverage goroutines to build a “concurrent-first” design. This is a typical solution for golang and follows language paradigms, treating goroutines as lightweight tools for handling blocking operations. Two goroutines will be spun up for each connection and will call blocking reads for each end. When reads return, any data will be written to the other side. If one connection is closed, the other will be closed as well. This will likely require some carful handling of contexts at the least. A worker routine(s) will keep track of existing connections and routinely report existing connections to the rate limiting cache. This will enable tracking client connections for rate limiting and tracking server connections for load balancing.
+Leverage goroutines to build a “concurrent-first” design. This is a typical solution for golang and follows language paradigms, treating goroutines as lightweight tools for handling blocking operations. Two goroutines will be spun up for each connection and will call blocking reads for each end. When reads return, any data will be written to the other side. If one connection is closed, the other will be closed as well. A worker routine(s) will keep track of existing connections and routinely report existing connections to the rate limiting cache. This will enable tracking client connections for rate limiting and tracking server connections for load balancing.
 
 ![](0000-tcp-load-balancer/library-blocking-io.png)
 
@@ -156,7 +132,7 @@ This design, though non-traditional for industry standard load balancers, lets u
 ## Implementation - Server
 
 ### CLI UX
-A strait forward CLI will be offered, and will start the server based on hard coded configurations. The process will listen for signals and stop accordingly. If the process is sent a signal to exit, it will attempt to close gracefully. If it does successfully, it will return 0. Otherwise, it will return 1, the catchall for general errors. It may be worth differentiating between a failed start and a failed graceful exit, but for now, we'll leverage STDOUT and/or STDERR to inform the user what happened.
+A straight forward CLI will be offered, and will start the server based on hard coded configurations. The process will listen for signals and stop accordingly. If the process is sent a signal to exit, it will attempt to close gracefully. If it does successfully, it will return 0. Otherwise, it will return 1, the catchall for general errors. It may be worth differentiating between a failed start and a failed graceful exit, but for now, we'll leverage STDOUT and/or STDERR to inform the user what happened.
 
 ```go 
 // Hardcoded values used for CLI
@@ -188,14 +164,15 @@ Certificates should typically be signed by a certificate authority, for the purp
 
 
 ### Authorization
-The server will authorize new connections based on a simple scheme defining upstreamGroups and clients which are allowed to access them. It will be whitelist only. Clients will be identified by either the subject of the certificate, or just the CN (common name) from the subject. (chosen during implementation)
+The server will authorize new connections based on a simple scheme defining upstreamGroups and clients which are allowed to access them. It will be whitelist only. Clients will be identified by either the subject of the certificate, or just the CN (common name) from the subject. (chosen during implementation) By leveraging SNI, a TLS extension, A client's upstream will be chosen based on the server listed in client hello message.
 
 ```go
 // ClientWhitelist is an explicit map of clientIDs to 
-// available upstreamGroups
-var c map[string][]string = map[string][]string{
+// available upstreamGroups (either the subject of the certificate,
+// or just the CN (common name) from the subject)
+var ClientWhitelist = map[string][]string{
     "FreeTrialClient": []string{
-        "UIServers",s
+        "UIServers",
     },
     "StandardClient": []string{
         "UIServers",
