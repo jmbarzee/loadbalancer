@@ -96,15 +96,20 @@ func TestUpstreamConnsCounts(t *testing.T) {
 			op: func(tracker *UpstreamConns) {
 				tracker.UpstreamHealthy(upstream1)
 				tracker.UpstreamHealthy(upstream2)
-				tracker.BeginConnection()
-				tracker.BeginConnection()
+				_, err := tracker.BeginConnection()
+				failIfNotNil(t, err)
+				_, err = tracker.BeginConnection()
+				failIfNotNil(t, err)
 
 				tracker.UpstreamUnhealthy(upstream1)
-				tracker.BeginConnection()
-				tracker.BeginConnection()
+				_, err = tracker.BeginConnection()
+				failIfNotNil(t, err)
+				_, err = tracker.BeginConnection()
+				failIfNotNil(t, err)
 
 				tracker.UpstreamHealthy(upstream1)
-				tracker.BeginConnection()
+				_, err = tracker.BeginConnection()
+				failIfNotNil(t, err)
 			},
 			expectedUpstreams: map[uuid.UUID]*upstream{
 				upstream1: {
@@ -146,5 +151,12 @@ func TestUpstreamConnsCounts(t *testing.T) {
 		if test.expectedPQ != nil && !reflect.DeepEqual(test.expectedPQ, actualPQ) {
 			t.Errorf("test(%v) expectedPQ did not match actualPQ: \n %v != %v\n", i, test.expectedPQ, actualPQ)
 		}
+	}
+}
+
+func failIfNotNil(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Errorf("unexpected error: %v\n", err)
 	}
 }
