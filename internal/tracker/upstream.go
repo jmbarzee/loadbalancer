@@ -97,8 +97,8 @@ func (t *UpstreamConns) EndConnection(id uuid.UUID) {
 	heap.Fix(t.pq, upstream.index)
 }
 
-// UpstreamUnhealthy is used to remove an upstream from the available upstreams
-func (t *UpstreamConns) UpstreamUnhealthy(id uuid.UUID) {
+// UpstreamUnavailable is used to remove an upstream from the available upstreams
+func (t *UpstreamConns) UpstreamUnavailable(id uuid.UUID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -113,8 +113,8 @@ func (t *UpstreamConns) UpstreamUnhealthy(id uuid.UUID) {
 	t.pq.remove(upstream)
 }
 
-// UpstreamHealthy is used to restore an upstream to the available upstreams
-func (t *UpstreamConns) UpstreamHealthy(id uuid.UUID) {
+// UpstreamAvailable is used to restore an upstream to the available upstreams
+func (t *UpstreamConns) UpstreamAvailable(id uuid.UUID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
