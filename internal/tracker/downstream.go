@@ -8,7 +8,10 @@ import (
 // unique string identifier.
 // DownstreamConns safe for concurrent use.
 type DownstreamConns struct {
-	mu         sync.Mutex
+	// mu protects the resources of DownstreamConns
+	mu sync.Mutex
+
+	// connCounts is a map of downstream to a count of connections
 	connCounts map[string]uint32
 }
 
