@@ -42,10 +42,13 @@ func (t *DownstreamConns) TryRecordConnection(downstreamID string, max uint32) b
 }
 
 // ConnectionEnded decrements the count of connections for a given downstreamID.
-// ConnectionEnded requires that a connection was begun previously,
-// otherwise it may access a key which does not exist.
 func (t *DownstreamConns) ConnectionEnded(downstreamID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	_, ok := t.connCounts[downstreamID]
+	if !ok {
+		// id was not found
+		return
+	}
 	t.connCounts[downstreamID]--
 }

@@ -80,15 +80,17 @@ func (t *UpstreamConns) NextAvailableUpstream() (uuid.UUID, error) {
 	return upstream.id, nil
 }
 
-// ConnectionEnded takes the UUID of the upstream which has just had a connection terminate
-// and records the ended connection.
-// ConnectionEnded requires that a connection was begun previously,
-// otherwise it may access a key which does not exist and panic from nil pointer dereference
+// ConnectionEnded takes the UUID of the upstream which has
+// just had a connection terminate and records the ended connection.
 func (t *UpstreamConns) ConnectionEnded(id uuid.UUID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	upstream := t.upstreams[id]
+	upstream, ok := t.upstreams[id]
+	if !ok {
+		// id was not found
+		return
+	}
 	upstream.connCount--
 
 	if upstream.index < 0 {
@@ -100,13 +102,15 @@ func (t *UpstreamConns) ConnectionEnded(id uuid.UUID) {
 }
 
 // UpstreamUnavailable is used to remove an upstream from the available upstreams
-// UpstreamUnavailable requires that the given id was provided to NewUpstreamConns(),
-// otherwise it may access a key which does not exist and panic from nil pointer dereference
 func (t *UpstreamConns) UpstreamUnavailable(id uuid.UUID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	upstream := t.upstreams[id]
+	upstream, ok := t.upstreams[id]
+	if !ok {
+		// id was not found
+		return
+	}
 
 	if upstream.index < 0 {
 		// upstream is not in the upstreamPQ
@@ -118,13 +122,15 @@ func (t *UpstreamConns) UpstreamUnavailable(id uuid.UUID) {
 }
 
 // UpstreamAvailable is used to restore an upstream to the available upstreams
-// UpstreamAvailable requires that the given id was provided to NewUpstreamConns(),
-// otherwise it may access a key which does not exist and panic from nil pointer dereference
 func (t *UpstreamConns) UpstreamAvailable(id uuid.UUID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	upstream := t.upstreams[id]
+	upstream, ok := t.upstreams[id]
+	if !ok {
+		// id was not found
+		return
+	}
 
 	if upstream.index > -1 {
 		// upstream is in the upstreamPQ
