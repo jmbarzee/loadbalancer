@@ -22,11 +22,11 @@ func NewDownstreamConns() *DownstreamConns {
 	}
 }
 
-// TryBeginConnection checks if a downstreamID is below a maximum
+// TryRecordConnection checks if a downstreamID's connections are below the provided max
 // and if so records an additional connection for the downstream.
 // If the downstream has no history, a new count will be started.
 // The return indicates if the new connection should be allowed.
-func (t *DownstreamConns) TryBeginConnection(downstreamID string, max uint32) bool {
+func (t *DownstreamConns) TryRecordConnection(downstreamID string, max uint32) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	value, ok := t.connCounts[downstreamID]
@@ -35,17 +35,17 @@ func (t *DownstreamConns) TryBeginConnection(downstreamID string, max uint32) bo
 		return true
 	}
 	if value < max {
-		t.connCounts[downstreamID] = value + 1
+		t.connCounts[downstreamID]++
 		return true
 	}
 	return false
 }
 
-// EndConnection decrements the count of connections for a given downstreamID.
-// EndConnection requires that a connection was begun previously,
+// ConnectionEnded decrements the count of connections for a given downstreamID.
+// ConnectionEnded requires that a connection was begun previously,
 // otherwise it may access a key which does not exist.
-func (t *DownstreamConns) EndConnection(downstreamID string) {
+func (t *DownstreamConns) ConnectionEnded(downstreamID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.connCounts[downstreamID] -= t.connCounts[downstreamID]
+	t.connCounts[downstreamID]--
 }

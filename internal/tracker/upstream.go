@@ -47,7 +47,7 @@ type upstream struct {
 // upstreams must be marked as healthy before they will be
 // added to the internal priorityQueue and available for BeginConnection()
 func NewUpstreamConns(upstreamIDs []uuid.UUID) *UpstreamConns {
-	upstreams := map[uuid.UUID]*upstream{}
+	upstreams := make(map[uuid.UUID]*upstream, len(upstreamIDs))
 	for _, id := range upstreamIDs {
 		upstreams[id] = &upstream{
 			id:    id,
@@ -60,10 +60,10 @@ func NewUpstreamConns(upstreamIDs []uuid.UUID) *UpstreamConns {
 	}
 }
 
-// BeginConnection returns the UUID of the upstream with the least connections
+// NextAvailableUpstream returns the UUID of the upstream with the least connections
 // and records the additional connection.
 // An error is returned if there are no available upstreams
-func (t *UpstreamConns) BeginConnection() (uuid.UUID, error) {
+func (t *UpstreamConns) NextAvailableUpstream() (uuid.UUID, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -75,19 +75,21 @@ func (t *UpstreamConns) BeginConnection() (uuid.UUID, error) {
 	// do we need a check for an upstream which is not in the upstreamPQ?
 	// The assumption is that we are only incrementing upstreams which are
 	// healthy and in the upstreamPQ. unhealthy upstreams are removed from the upstreamPQ.
-	upstream.connCount += 1
+	upstream.connCount++
 	heap.Fix(t.pq, upstream.index)
 	return upstream.id, nil
 }
 
-// EndConnection takes the UUID of the upstream which has just had a connection terminate
+// ConnectionEnded takes the UUID of the upstream which has just had a connection terminate
 // and records the ended connection.
-func (t *UpstreamConns) EndConnection(id uuid.UUID) {
+// ConnectionEnded requires that a connection was begun previously,
+// otherwise it may access a key which does not exist and panic from nil pointer dereference
+func (t *UpstreamConns) ConnectionEnded(id uuid.UUID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	upstream := t.upstreams[id]
-	upstream.connCount -= 1
+	upstream.connCount--
 
 	if upstream.index < 0 {
 		// upstream is not in the upstreamPQ
@@ -98,6 +100,8 @@ func (t *UpstreamConns) EndConnection(id uuid.UUID) {
 }
 
 // UpstreamUnavailable is used to remove an upstream from the available upstreams
+// UpstreamUnavailable requires that the given id was provided to NewUpstreamConns(),
+// otherwise it may access a key which does not exist and panic from nil pointer dereference
 func (t *UpstreamConns) UpstreamUnavailable(id uuid.UUID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -106,7 +110,7 @@ func (t *UpstreamConns) UpstreamUnavailable(id uuid.UUID) {
 
 	if upstream.index < 0 {
 		// upstream is not in the upstreamPQ
-		// generally should not be possible, but safe to check
+		// generally should not be likely, but possible
 		return
 	}
 
@@ -114,6 +118,8 @@ func (t *UpstreamConns) UpstreamUnavailable(id uuid.UUID) {
 }
 
 // UpstreamAvailable is used to restore an upstream to the available upstreams
+// UpstreamAvailable requires that the given id was provided to NewUpstreamConns(),
+// otherwise it may access a key which does not exist and panic from nil pointer dereference
 func (t *UpstreamConns) UpstreamAvailable(id uuid.UUID) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -122,7 +128,7 @@ func (t *UpstreamConns) UpstreamAvailable(id uuid.UUID) {
 
 	if upstream.index > -1 {
 		// upstream is in the upstreamPQ
-		// generally should not be possible, but safe to check
+		// generally should not be likely, but possible
 		return
 	}
 

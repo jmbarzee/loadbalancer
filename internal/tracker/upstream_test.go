@@ -23,8 +23,8 @@ func TestUpstreamConnsCounts(t *testing.T) {
 		{
 			name: "multiple routines requesting connections",
 			op: func(tracker *UpstreamConns) {
-				tracker.UpstreamHealthy(upstream1)
-				tracker.UpstreamHealthy(upstream2)
+				tracker.UpstreamAvailable(upstream1)
+				tracker.UpstreamAvailable(upstream2)
 
 				wg := sync.WaitGroup{}
 				wg.Add(2)
@@ -39,7 +39,7 @@ func TestUpstreamConnsCounts(t *testing.T) {
 				for i := 0; i < 2; i++ {
 					go func() {
 						for j := 0; j < 5; j++ {
-							_, err := tracker.BeginConnection()
+							_, err := tracker.NextAvailableUpstream()
 							if err != nil {
 								t.Errorf("unexpected error: %v\n", err)
 							}
@@ -63,13 +63,13 @@ func TestUpstreamConnsCounts(t *testing.T) {
 		{
 			name: "return errors when there are no available upstreams",
 			op: func(tracker *UpstreamConns) {
-				_, err := tracker.BeginConnection()
+				_, err := tracker.NextAvailableUpstream()
 				if !errors.Is(err, errorNoAvailableUpstream) {
 					t.Errorf("expected error %v, but got nil\n", errorNoAvailableUpstream)
 				}
-				tracker.UpstreamHealthy(upstream1)
+				tracker.UpstreamAvailable(upstream1)
 
-				_, err = tracker.BeginConnection()
+				_, err = tracker.NextAvailableUpstream()
 				if err != nil {
 					t.Errorf("unexpected error: %v\n", err)
 				}
@@ -94,21 +94,21 @@ func TestUpstreamConnsCounts(t *testing.T) {
 		{
 			name: "only allow healthy upstreams to get new connections",
 			op: func(tracker *UpstreamConns) {
-				tracker.UpstreamHealthy(upstream1)
-				tracker.UpstreamHealthy(upstream2)
-				_, err := tracker.BeginConnection()
+				tracker.UpstreamAvailable(upstream1)
+				tracker.UpstreamAvailable(upstream2)
+				_, err := tracker.NextAvailableUpstream()
 				failIfNotNil(t, err)
-				_, err = tracker.BeginConnection()
-				failIfNotNil(t, err)
-
-				tracker.UpstreamUnhealthy(upstream1)
-				_, err = tracker.BeginConnection()
-				failIfNotNil(t, err)
-				_, err = tracker.BeginConnection()
+				_, err = tracker.NextAvailableUpstream()
 				failIfNotNil(t, err)
 
-				tracker.UpstreamHealthy(upstream1)
-				_, err = tracker.BeginConnection()
+				tracker.UpstreamUnavailable(upstream1)
+				_, err = tracker.NextAvailableUpstream()
+				failIfNotNil(t, err)
+				_, err = tracker.NextAvailableUpstream()
+				failIfNotNil(t, err)
+
+				tracker.UpstreamAvailable(upstream1)
+				_, err = tracker.NextAvailableUpstream()
 				failIfNotNil(t, err)
 			},
 			expectedUpstreams: map[uuid.UUID]*upstream{

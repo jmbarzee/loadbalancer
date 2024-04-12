@@ -18,7 +18,7 @@ func TestDownstreamConnsCounts(t *testing.T) {
 		{
 			name: "record a new downstream connection if under maximum",
 			op: func(tracker *DownstreamConns) {
-				tracker.TryBeginConnection(downstream1, 10)
+				tracker.TryRecordConnection(downstream1, 10)
 			},
 			expectedCounts: map[string]uint32{
 				downstream1: 1,
@@ -27,8 +27,8 @@ func TestDownstreamConnsCounts(t *testing.T) {
 		{
 			name: "record a connection ending",
 			op: func(tracker *DownstreamConns) {
-				tracker.TryBeginConnection(downstream1, 10)
-				tracker.EndConnection(downstream1)
+				tracker.TryRecordConnection(downstream1, 10)
+				tracker.ConnectionEnded(downstream1)
 			},
 			expectedCounts: map[string]uint32{
 				downstream1: 0,
@@ -37,22 +37,22 @@ func TestDownstreamConnsCounts(t *testing.T) {
 		{
 			name: "don't record connections which would extend beyond maximum",
 			op: func(tracker *DownstreamConns) {
-				tracker.TryBeginConnection(downstream1, 10)
-				tracker.TryBeginConnection(downstream1, 10)
-				tracker.TryBeginConnection(downstream2, 2)
-				tracker.TryBeginConnection(downstream2, 2)
+				tracker.TryRecordConnection(downstream1, 10)
+				tracker.TryRecordConnection(downstream1, 10)
+				tracker.TryRecordConnection(downstream2, 2)
+				tracker.TryRecordConnection(downstream2, 2)
 
 				// this connection should not be recorded because of the maximums
-				tracker.TryBeginConnection(downstream2, 2)
-				tracker.TryBeginConnection(downstream1, 10)
+				tracker.TryRecordConnection(downstream2, 2)
+				tracker.TryRecordConnection(downstream1, 10)
 
-				tracker.EndConnection(downstream1)
-				tracker.EndConnection(downstream1)
-				tracker.EndConnection(downstream1)
-				tracker.EndConnection(downstream2)
-				tracker.EndConnection(downstream2)
+				tracker.ConnectionEnded(downstream1)
+				tracker.ConnectionEnded(downstream1)
+				tracker.ConnectionEnded(downstream1)
+				tracker.ConnectionEnded(downstream2)
+				tracker.ConnectionEnded(downstream2)
 
-				tracker.TryBeginConnection(downstream2, 2)
+				tracker.TryRecordConnection(downstream2, 2)
 			},
 			expectedCounts: map[string]uint32{
 				downstream1: 0,
@@ -71,25 +71,25 @@ func TestDownstreamConnsCounts(t *testing.T) {
 				// but it was quick to write, and does ensure that separate goroutines
 				// can end connections which they didn't begin.
 				go func() {
-					tracker.TryBeginConnection(downstream2, 2)
-					tracker.TryBeginConnection(downstream1, 10)
+					tracker.TryRecordConnection(downstream2, 2)
+					tracker.TryRecordConnection(downstream1, 10)
 					wg.Done()
 				}()
 				go func() {
-					tracker.TryBeginConnection(downstream1, 10)
-					tracker.TryBeginConnection(downstream1, 10)
-					tracker.TryBeginConnection(downstream2, 2)
-					tracker.TryBeginConnection(downstream2, 2)
+					tracker.TryRecordConnection(downstream1, 10)
+					tracker.TryRecordConnection(downstream1, 10)
+					tracker.TryRecordConnection(downstream2, 2)
+					tracker.TryRecordConnection(downstream2, 2)
 					wg.Done()
 				}()
 
 				wg.Wait()
-				tracker.EndConnection(downstream1)
-				tracker.EndConnection(downstream1)
-				tracker.EndConnection(downstream1)
-				tracker.EndConnection(downstream2)
-				tracker.EndConnection(downstream2)
-				tracker.TryBeginConnection(downstream2, 2)
+				tracker.ConnectionEnded(downstream1)
+				tracker.ConnectionEnded(downstream1)
+				tracker.ConnectionEnded(downstream1)
+				tracker.ConnectionEnded(downstream2)
+				tracker.ConnectionEnded(downstream2)
+				tracker.TryRecordConnection(downstream2, 2)
 			},
 			expectedCounts: map[string]uint32{
 				downstream1: 0,
