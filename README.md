@@ -5,3 +5,11 @@
 [![Code Quality](https://goreportcard.com/badge/github.com/jmbarzee/loadbalancer)](https://goreportcard.com/report/github.com/jmbarzee/loadbalancer)
 
 TCP LoadBalancer - Supporting authentication, authorization, and rate limiting
+
+
+## Key Gen
+
+```sh
+    keygen.sh
+    go run cmd/certgen/main.go
+```

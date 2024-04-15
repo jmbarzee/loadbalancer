@@ -45,6 +45,10 @@ type Downstream interface {
 
 	// MaxConnections is the number of connections which will be allowed by rate limiting
 	MaxConnections() uint32
+
+	// AllowedServerGroups provides a slice of server groups which the downstream is allowed to connect to.
+	// Not used by core library, only used by github.com/jmbarzee/loadbalancer/
+	AllowedServerGroups() []string
 }
 
 // downstreamConnLimit is a convenience function to lookup the connection limit for a given downstream downstreamID
