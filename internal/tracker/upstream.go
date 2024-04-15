@@ -46,18 +46,22 @@ type upstream struct {
 // with upstreams based on provided upstreamIDs.
 // upstreams must be marked as healthy before they will be
 // added to the internal priorityQueue and available for BeginConnection()
-func NewUpstreamConns(upstreamIDs []uuid.UUID) *UpstreamConns {
-	upstreams := make(map[uuid.UUID]*upstream, len(upstreamIDs))
-	for _, id := range upstreamIDs {
-		upstreams[id] = &upstream{
-			id:    id,
-			index: -1,
-		}
-	}
+func NewUpstreamConns() *UpstreamConns {
 	return &UpstreamConns{
-		upstreams: upstreams,
+		upstreams: map[uuid.UUID]*upstream{},
 		pq:        &upstreamPQ{},
 	}
+}
+
+func (t *UpstreamConns) AddUpstream(id uuid.UUID) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.upstreams[id] = &upstream{
+		id:    id,
+		index: -1,
+	}
+
 }
 
 // NextAvailableUpstream returns the UUID of the upstream with the least connections
