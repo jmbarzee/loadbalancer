@@ -34,7 +34,7 @@ Describe the features and design of a layer 4 load balancer as a catalyst for di
 ## Security Considerations
 Downstream clients should be considered untrustworthy until authenticated, no operation should proceed authentication.
 
-Overloading Upstream systems should be prevented through rate limiting downstream clients. Downstream clients will receive errors when they are being rate limited. These errors and others shouldn't expose internal information about upstream hosts, inaccessible host groups, or other downstream clients. In general, errors should give ample information to a downstream client, but nothing more than necessary for them to address the issue.
+Overloading Upstream systems should be prevented through rate limiting downstream clients. Library will log errors when downstreams are being rate limited. These errors and others should only expose necessary internal information about upstream hosts, inaccessible host groups, or other downstream clients.
 
 ### Remaining Risks (not exhaustive)
 - Self signed certs are generally less secure and more easily imitated
@@ -93,9 +93,9 @@ type LoadBalancer interface {
 // the health state of Upstream.
 // Another for inserting the Upstream into the LoadBalancer.
 type Upstream interface {
-    // ID is used primarily to look up the Upstream's connections
-    // in the rate limit cache. Maybe better thought of as the "connection tracker".
-    ID() string // possibly changed to a typed uuid
+    // ID is used primarily to look up the Upstream's connections.
+    //  Maybe better thought of as the "connection tracker".
+    ID() uuid.UUID
 
     // Provides necessary information to call net.DialTCP()
     TCPAddr() net.TCPAddr

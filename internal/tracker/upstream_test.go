@@ -137,7 +137,9 @@ func TestUpstreamConnsCounts(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		tracker := NewUpstreamConns([]uuid.UUID{upstream1, upstream2})
+		tracker := NewUpstreamConns()
+		tracker.AddUpstream(upstream1)
+		tracker.AddUpstream(upstream2)
 		test.op(tracker)
 		actualUpstreams := tracker.upstreams
 		for id, actualUpstream := range actualUpstreams {
