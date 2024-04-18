@@ -35,7 +35,7 @@ type Trafficker struct {
 	// An upstream's health only determines control flow for health checking mechanisms
 	// but does not necessarily represent availability. Availability is handled
 	// by upstreamTrackers and is eventually consistent with upstreamHealth.
-	upstreamHealth upstreamHealth
+	upstreamHealth *upstreamHealth
 
 	config Config
 
@@ -77,8 +77,11 @@ func NewTrafficker(config Config, downs []Downstream, ups []Upstream, logger *lo
 	}
 
 	return &Trafficker{
+		downstreams:       downstreams,
 		downstreamTracker: tracker.NewDownstreamConns(),
+		upstreams:         upstreams,
 		upstreamTrackers:  upstreamTrackers,
+		upstreamHealth:    upstreamHealth,
 		config:            config,
 		logger:            logger,
 	}
